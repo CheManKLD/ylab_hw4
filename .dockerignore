@@ -1,0 +1,11 @@
+.git
+.gitignore
+
+**/*.pyc
+
+*.md
+.env*
+
+Dockerfile
+*.yaml
+*.yml
