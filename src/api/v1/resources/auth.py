@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 
 from src.api.v1.schemas import (AuthUser, SignupUser, Token, UserModel,
-                                         UserProfile)
+                                UserProfile)
 from src.core.token import create_tokens
 from src.services import (AuthService, UserService, get_auth_service,
-                                   get_user_service, oauth2_scheme)
+                          get_user_service, oauth2_scheme)
 
 router = APIRouter()
 

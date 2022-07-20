@@ -3,7 +3,6 @@ from functools import lru_cache
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from psycopg2.errors import UniqueViolation
-from pydantic import EmailError, validate_email
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
@@ -23,12 +22,6 @@ class AuthService(ServiceMixin):
         """Вернет информацию о новом созданном пользователе."""
         exception = HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
         user.email = user.email.lower()
-        try:
-            validate_email(user.email)
-        except EmailError:
-            # Если email не прошел валидацию, отдаём 400 статус
-            exception.detail = "invalid email format"
-            raise exception
         hash_password = get_hash_password(user.password)
         new_user = User(username=user.username, password=hash_password,
                         email=user.email)

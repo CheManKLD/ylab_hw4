@@ -2,7 +2,6 @@ from functools import lru_cache
 
 from fastapi import Depends, HTTPException, status
 from psycopg2.errors import UniqueViolation
-from pydantic import EmailError, validate_email
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
@@ -34,7 +33,6 @@ class UserService(ServiceMixin):
 
     def update_user(self, token: str, new_data: UserUpdate) -> dict:
         """Вернет обновленную информацию об аутентифицированном пользователе."""
-        exception = HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
         payload = validate_token(token)
         if not payload:
             # Если токен не прошел валидацию, отдаём 401 статус
@@ -43,14 +41,7 @@ class UserService(ServiceMixin):
         user_uuid = payload.get("user_uuid")
         user = self.session.get(User, user_uuid)
         for key, value in new_data.dict(exclude_unset=True).items():
-            if key == "email" and value:
-                try:
-                    validate_email(value)
-                except EmailError:
-                    # Если email не прошел валидацию, отдаём 400 статус
-                    exception.detail = "invalid email format"
-                    raise exception
-            elif key == "password" and value:
+            if key == "password" and value:
                 value = get_hash_password(value)
             if value:
                 setattr(user, key, value)
@@ -61,8 +52,8 @@ class UserService(ServiceMixin):
         except IntegrityError as error:
             # Если username или email уже существует, отдаём 400 статус
             assert isinstance(error.orig, UniqueViolation)
-            exception.detail = "username or email is already exists"
-            raise exception
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="username or email is already exists")
         return user.dict()
 
 

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 
 __all__ = (
     "UserModel",
@@ -34,5 +34,5 @@ class UserProfile(BaseModel):
 
 class UserUpdate(BaseModel):
     username: Optional[str]
-    email: Optional[str]
-    password: Optional[str]
+    email: Optional[EmailStr]
+    password: Optional[str] = Field(min_length=5, max_length=20)

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 
 __all__ = (
     "Token",
@@ -12,8 +12,8 @@ class AuthBase(BaseModel):
 
 
 class SignupUser(AuthBase):
-    email: str
-    password: str
+    email: EmailStr
+    password: str = Field(min_length=5, max_length=20)
 
 
 class AuthUser(AuthBase):
