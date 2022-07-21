@@ -3,6 +3,7 @@ from calendar import timegm
 from datetime import datetime, timedelta
 from typing import Optional
 
+from fastapi import HTTPException, status
 from jose import JWTError, jwt
 
 from src.api.v1.schemas import UserProfile
@@ -71,5 +72,7 @@ def validate_token(token: str) -> Optional[dict]:
         payload = jwt.decode(token, key=config.JWT_SECRET_KEY,
                              algorithms=config.JWT_ALGORITHM)
     except JWTError:
-        return
+        # Если токен не прошел валидацию, отдаём 401 статус
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="could not validate credentials")
     return payload

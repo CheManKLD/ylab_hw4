@@ -31,12 +31,24 @@ def startup():
             host=config.REDIS_HOST, port=config.REDIS_PORT, max_connections=10
         )
     )
+    cache.blocked_access_tokens_cache = redis_cache.AccessTokenCacheRedis(
+        cache_instance=redis.Redis(
+            host=config.REDIS_HOST, port=config.REDIS_PORT, max_connections=10, db=1
+        )
+    )
+    cache.active_refresh_tokens_cache = redis_cache.RefreshTokenCacheRedis(
+        cache_instance=redis.Redis(
+            host=config.REDIS_HOST, port=config.REDIS_PORT, max_connections=10, db=2
+        )
+    )
 
 
 @app.on_event("shutdown")
 def shutdown():
     """Отключаемся от баз при выключении сервера"""
     cache.cache.close()
+    cache.blocked_access_tokens_cache.close()
+    cache.active_refresh_tokens_cache.close()
 
 
 # Подключаем роутеры к серверу

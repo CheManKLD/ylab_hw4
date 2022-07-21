@@ -2,7 +2,7 @@ import json
 from functools import lru_cache
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from sqlmodel import Session
 
 from src.api.v1.schemas import PostCreate, PostModel
@@ -32,9 +32,7 @@ class PostService(ServiceMixin):
 
     def create_post(self, post: PostCreate, token: str) -> dict:
         """Создать пост."""
-        if not validate_token(token):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                                detail="could not validate credentials")
+        validate_token(token)
         new_post = Post(title=post.title, description=post.description)
         self.session.add(new_post)
         self.session.commit()

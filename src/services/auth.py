@@ -8,16 +8,17 @@ from sqlmodel import Session
 
 from src.api.v1.schemas import AuthUser, SignupUser
 from src.core.security import get_hash_password, verify_password
-from src.db import AbstractCache, get_cache, get_session
+from src.db import (AbstractCache, ListAbstractCache, get_access_tokens_cache,
+                    get_refresh_tokens_cache, get_session)
 from src.models import User
-from src.services import ServiceMixin
+from src.services import AuthServiceMixin
 
 __all__ = ("AuthService", "get_auth_service", "oauth2_scheme")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
 
 
-class AuthService(ServiceMixin):
+class AuthService(AuthServiceMixin):
     def register_new_user(self, user: SignupUser) -> dict:
         """Вернет информацию о новом созданном пользователе."""
         exception = HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
@@ -49,6 +50,11 @@ class AuthService(ServiceMixin):
 
 
 @lru_cache()
-def get_auth_service(cache: AbstractCache = Depends(get_cache),
-                     session: Session = Depends(get_session)) -> AuthService:
-    return AuthService(cache=cache, session=session)
+def get_auth_service(
+    blocked_access_tokens_cache: AbstractCache = Depends(get_access_tokens_cache),
+    active_refresh_tokens_cache: ListAbstractCache = Depends(get_refresh_tokens_cache),
+    session: Session = Depends(get_session)
+) -> AuthService:
+    return AuthService(blocked_access_tokens_cache=blocked_access_tokens_cache,
+                       active_refresh_tokens_cache=active_refresh_tokens_cache,
+                       session=session)

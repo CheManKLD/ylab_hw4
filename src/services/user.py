@@ -8,36 +8,51 @@ from sqlmodel import Session
 from src.api.v1.schemas import UserUpdate
 from src.core.security import get_hash_password
 from src.core.token import validate_token
-from src.db import AbstractCache, get_cache, get_session
+from src.db import (AbstractCache, ListAbstractCache, get_access_tokens_cache,
+                    get_refresh_tokens_cache, get_session)
 from src.models import User
-from src.services import ServiceMixin
+from src.services import AuthServiceMixin
 
 __all__ = ("UserService", "get_user_service")
 
 
-class UserService(ServiceMixin):
-    def get_current_user(self, token: str) -> dict:
+class UserService(AuthServiceMixin):
+    def get_current_user(self, token: str,
+                         is_refresh_token: bool = False) -> dict:
         """Вернет информацию об аутентифицированном пользователе."""
-        exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                                  detail="could not validate credentials")
+        exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         payload = validate_token(token)
-        if not payload:
-            # Если токен не прошел валидацию, отдаём 401 статус
-            raise exception
         user_uuid = payload.get("user_uuid")
+        if is_refresh_token:
+            refresh_jti = payload.get("jti")
+            is_active_token = self.active_refresh_tokens_cache.find(key=user_uuid,
+                                                                    value=refresh_jti)
+            if not is_active_token:
+                # Если токен не активен, отдаём 401 статус
+                exception.detail = "the refresh token is expired"
+                raise exception
+        else:
+            access_jti = payload.get("jti")
+            blocked_token = self.blocked_access_tokens_cache.get(key=access_jti)
+            if blocked_token:
+                # Если токен заблокирован, отдаём 401 статус
+                exception.detail = "the access token is expired"
+                raise exception
         user = self.session.get(User, user_uuid)
         if not user:
             # Если пользователь не найден, отдаём 401 статус
             raise exception
         return user.dict()
 
-    def update_user(self, token: str, new_data: UserUpdate) -> dict:
+    def update_user(self, access_token: str, new_data: UserUpdate) -> dict:
         """Вернет обновленную информацию об аутентифицированном пользователе."""
-        payload = validate_token(token)
-        if not payload:
-            # Если токен не прошел валидацию, отдаём 401 статус
+        payload = validate_token(access_token)
+        access_jti = payload.get("jti")
+        blocked_token = self.blocked_access_tokens_cache.get(key=access_jti)
+        if blocked_token:
+            # Если токен заблокирован, отдаём 401 статус
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                                detail="could not validate credentials")
+                                detail="the access token is expired")
         user_uuid = payload.get("user_uuid")
         user = self.session.get(User, user_uuid)
         for key, value in new_data.dict(exclude_unset=True).items():
@@ -54,10 +69,17 @@ class UserService(ServiceMixin):
             assert isinstance(error.orig, UniqueViolation)
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="username or email is already exists")
+        access_jti = payload.get("jti")
+        self.blocked_access_tokens_cache.set(key=access_jti, value="block")
         return user.dict()
 
 
 @lru_cache()
-def get_user_service(cache: AbstractCache = Depends(get_cache),
-                     session: Session = Depends(get_session)) -> UserService:
-    return UserService(cache=cache, session=session)
+def get_user_service(
+    blocked_access_tokens_cache: AbstractCache = Depends(get_access_tokens_cache),
+    active_refresh_tokens_cache: ListAbstractCache = Depends(get_refresh_tokens_cache),
+    session: Session = Depends(get_session)
+) -> UserService:
+    return UserService(blocked_access_tokens_cache=blocked_access_tokens_cache,
+                       active_refresh_tokens_cache=active_refresh_tokens_cache,
+                       session=session)
